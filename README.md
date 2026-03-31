@@ -1,6 +1,6 @@
 # ai-ks-design
 
-多节点开发环境编排：从 GitHub 拉取前后端与 SSH 容器仓库，按节点号起 Docker 容器，便于 SSH 进入并在挂载目录中开发。
+**把与你绑定的“改需求”，变成对方能自助搞定的一键环境。** 一条命令拉起前后端 + SSH 开发容器，需求方进去就能对着真实仓库用 AI 写代码、做小迭代——**细碎问题先找 AI，别先找你**；你守住评审与发布即可。前后端协作从“反复被打断”变成**可规模化的交付**：你的时间越省下来，整体效率越高，**你的工作方式也越值得被持续优化**。
 
 ## 协作模式对比与本项目优势
 
@@ -52,19 +52,6 @@ npx @z_ai/coding-helper
 
 ```bash
 ./scripts/teardown.sh node-100 --rm-root
-```
-
-### 方式二：批量创建多节点
-
-```bash
-# 创建 node-100 到 node-105
-./scripts/batch_provision.sh 100-105
-
-# 创建指定节点
-./scripts/batch_provision.sh 100 101 102
-
-# 创建 5 个节点（自动编号）
-./scripts/batch_provision.sh 5
 ```
 
 ### 前提条件
