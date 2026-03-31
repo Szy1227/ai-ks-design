@@ -283,11 +283,11 @@ cat >"${SSH_TFVARS}" <<EOF
 # 由 ai-ks-design/scripts/provision.sh 生成，可手工修改后重新执行 ai-ks-ssh-claude/tf_apply.sh
 external_port = ${SSH_PORT}
 mounts = [
-  { host_path = "../ai-ks-vue/code", container_path = "/home/ai-ks/vue", read_only = false },
-  { host_path = "../ai-ks-fastapi/code", container_path = "/home/ai-ks/fastapi", read_only = false },
+  { host_path = "../ai-ks-vue", container_path = "/home/ai-ks/vue", read_only = false },
+  { host_path = "../ai-ks-fastapi", container_path = "/home/ai-ks/fastapi", read_only = false },
 ]
 EOF
-echo "  已写入 external_port 与前后端 code 挂载（容器内 /home/ai-ks/vue、/home/ai-ks/fastapi）"
+echo "  已写入 external_port 与前后端仓库挂载（容器内 /home/ai-ks/vue、/home/ai-ks/fastapi，可直接 git diff）"
 
 step "7/7" "Terraform 拉起容器（TF_INIT_PLUGIN_DIR=${TF_INIT_PLUGIN_DIR}）"
 
