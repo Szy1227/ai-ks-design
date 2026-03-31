@@ -36,6 +36,24 @@ cd ai-ks-design
 ./scripts/provision.sh
 ```
 
+初始化后可继续进行 AI 工具配置（容器内已内置 Claude + 智谱工具）：
+
+```bash
+# 1) 先通过 SSH 进入节点（端口按 22000 + N）
+ssh ai-ks@<宿主机IP> -p <SSH端口>
+
+# 2) 在容器内配置智谱工具 API Key
+npx @z_ai/coding-helper
+```
+
+> 说明：SSH 容器已内置 `@anthropic-ai/claude-code` 与 `@z_ai/coding-helper`，首次进入后按提示完成 key 配置即可开始 AI-coding。
+
+删除环境（示例）：
+
+```bash
+./scripts/teardown.sh node-100 --rm-root
+```
+
 ### 方式二：批量创建多节点
 
 ```bash
