@@ -87,6 +87,98 @@ clone_or_pull() {
   fi
 }
 
+JOB_PIDS=()
+JOB_NAMES=()
+JOB_LOGS=()
+
+reset_jobs() {
+  JOB_PIDS=()
+  JOB_NAMES=()
+  JOB_LOGS=()
+}
+
+start_job() {
+  local name="$1"
+  shift
+  local log_file
+  log_file="$(mktemp "/tmp/provision-${name//[^a-zA-Z0-9_-]/_}-XXXX.log")"
+  (
+    set -euo pipefail
+    "$@"
+  ) >"${log_file}" 2>&1 &
+  JOB_PIDS+=("$!")
+  JOB_NAMES+=("$name")
+  JOB_LOGS+=("${log_file}")
+  echo "  [${name}] 已启动 (pid=$!)"
+}
+
+wait_jobs_or_die() {
+  local stage="$1"
+  local i failed=0
+
+  echo "  等待并行任务完成: ${stage}"
+  for i in "${!JOB_PIDS[@]}"; do
+    if wait "${JOB_PIDS[$i]}"; then
+      echo "  [${JOB_NAMES[$i]}] 完成"
+    else
+      failed=1
+      echo "  [${JOB_NAMES[$i]}] 失败（日志: ${JOB_LOGS[$i]}）" >&2
+    fi
+  done
+
+  if (( failed > 0 )); then
+    echo "" >&2
+    echo "===== 并行任务失败详情: ${stage} =====" >&2
+    for i in "${!JOB_PIDS[@]}"; do
+      if [[ -f "${JOB_LOGS[$i]}" ]]; then
+        echo "--- ${JOB_NAMES[$i]} ---" >&2
+        sed -n '1,200p' "${JOB_LOGS[$i]}" >&2
+      fi
+    done
+    die "${stage} 存在失败任务，请根据上方日志修复后重试。"
+  fi
+
+  for i in "${!JOB_LOGS[@]}"; do
+    rm -f "${JOB_LOGS[$i]}"
+  done
+  reset_jobs
+}
+
+sync_tools_repo() {
+  clone_or_pull "${GIT_TOOLS}" "${TOOLS_CLONE}"
+  mkdir -p "${TOOLS_PLUGINS}"
+}
+
+sync_base_vue_repo() {
+  clone_or_pull "${GIT_VUE}" "${BASE_ROOT}/ai-ks-vue"
+}
+
+sync_base_fastapi_repo() {
+  clone_or_pull "${GIT_FASTAPI}" "${BASE_ROOT}/ai-ks-fastapi"
+}
+
+sync_base_ssh_repo() {
+  clone_or_pull "${GIT_SSH}" "${BASE_ROOT}/ai-ks-ssh-claude"
+}
+
+apply_vue() {
+  cd "${ROOT}/ai-ks-vue"
+  chmod +x tf_apply.sh 2>/dev/null || true
+  ./tf_apply.sh "${VUE_PORT}" code "${STACK_SUFFIX}" "${NETWORK_NAME}" "http://ai-ks-fastapi${STACK_SUFFIX}:8000"
+}
+
+apply_fastapi() {
+  cd "${ROOT}/ai-ks-fastapi"
+  chmod +x tf_apply.sh 2>/dev/null || true
+  ./tf_apply.sh "${FASTAPI_PORT}" code "${STACK_SUFFIX}" "${NETWORK_NAME}"
+}
+
+apply_ssh() {
+  cd "${ROOT}/ai-ks-ssh-claude"
+  chmod +x tf_apply.sh 2>/dev/null || true
+  TF_VAR_stack_suffix="${STACK_SUFFIX}" ./tf_apply.sh
+}
+
 derive_next_n() {
   local max=-1
   local any=0
@@ -178,16 +270,17 @@ TOOLS_CLONE="${WORKSPACE_ROOT}/ai-ks-tools"
 TOOLS_PLUGINS="${TOOLS_CLONE}/terraform/plugins"
 export TF_INIT_PLUGIN_DIR="${TOOLS_PLUGINS}"
 
-step "2/7" "克隆或更新 ai-ks-tools（Terraform 插件目录: terraform/plugins）"
-clone_or_pull "${GIT_TOOLS}" "${TOOLS_CLONE}"
-mkdir -p "${TOOLS_PLUGINS}"
-echo "  插件目录: ${TF_INIT_PLUGIN_DIR}（请按需填入 provider，见 ai-ks-tools 说明）"
-
-step "3/7" "维护 workspace/node-base（git clone / pull 三应用仓库）"
+step "2/7" "启动并行下载/更新（ai-ks-tools + node-base 三应用）"
 mkdir -p "${BASE_ROOT}"
-clone_or_pull "${GIT_VUE}" "${BASE_ROOT}/ai-ks-vue"
-clone_or_pull "${GIT_FASTAPI}" "${BASE_ROOT}/ai-ks-fastapi"
-clone_or_pull "${GIT_SSH}" "${BASE_ROOT}/ai-ks-ssh-claude"
+reset_jobs
+start_job "ai-ks-tools" sync_tools_repo
+start_job "ai-ks-vue(base)" sync_base_vue_repo
+start_job "ai-ks-fastapi(base)" sync_base_fastapi_repo
+start_job "ai-ks-ssh-claude(base)" sync_base_ssh_repo
+
+step "3/7" "等待并行下载/更新完成"
+wait_jobs_or_die "下载/更新阶段"
+echo "  插件目录: ${TF_INIT_PLUGIN_DIR}（请按需填入 provider，见 ai-ks-tools 说明）"
 
 step "4/7" "准备工作目录 workspace/node-<N>"
 if [[ -d "$ROOT" ]] && [[ "$FORCE" -eq 1 ]]; then
@@ -223,23 +316,12 @@ else
   echo "  Docker 网络已存在: ${NETWORK_NAME}"
 fi
 
-echo ""
-echo "  7a) ai-ks-vue"
-( cd "${ROOT}/ai-ks-vue" && chmod +x tf_apply.sh 2>/dev/null || true
-  ./tf_apply.sh "${VUE_PORT}" code "${STACK_SUFFIX}" "${NETWORK_NAME}" "http://ai-ks-fastapi${STACK_SUFFIX}:8000"
-)
-
-echo ""
-echo "  7b) ai-ks-fastapi"
-( cd "${ROOT}/ai-ks-fastapi" && chmod +x tf_apply.sh 2>/dev/null || true
-  ./tf_apply.sh "${FASTAPI_PORT}" code "${STACK_SUFFIX}" "${NETWORK_NAME}"
-)
-
-echo ""
-echo "  7c) ai-ks-ssh-claude"
-( cd "${ROOT}/ai-ks-ssh-claude" && chmod +x tf_apply.sh 2>/dev/null || true
-  TF_VAR_stack_suffix="${STACK_SUFFIX}" ./tf_apply.sh
-)
+echo "  并行拉起: ai-ks-vue / ai-ks-fastapi / ai-ks-ssh-claude"
+reset_jobs
+start_job "ai-ks-vue(apply)" apply_vue
+start_job "ai-ks-fastapi(apply)" apply_fastapi
+start_job "ai-ks-ssh-claude(apply)" apply_ssh
+wait_jobs_or_die "创建阶段（Terraform apply）"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
