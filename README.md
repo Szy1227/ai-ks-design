@@ -1,6 +1,29 @@
 # ai-ks-design
 
-**把与你绑定的“改需求”，变成对方能自助搞定的一键环境。** 一条命令拉起前后端 + SSH 开发容器，需求方进去就能对着真实仓库用 AI 写代码、做小迭代——**细碎问题先找 AI，别先找你**；你守住评审与发布即可。前后端协作从“反复被打断”变成**可规模化的交付**：你的时间越省下来，整体效率越高，**你的工作方式也越值得被持续优化**。
+[![GitHub stars](https://img.shields.io/github/stars/Szy1227/ai-ks-design?style=social)](https://github.com/Szy1227/ai-ks-design)
+[![GitHub forks](https://img.shields.io/github/forks/Szy1227/ai-ks-design?style=social)](https://github.com/Szy1227/ai-ks-design/network/members)
+
+**一键把「你的开发环境」交付给需求方：** Docker 起 Vue + FastAPI + SSH，仓库**整库挂载**，对方 SSH 进容器就能改代码；内置 **Claude Code + `@z_ai/coding-helper`（智谱）** 做 AI-coding。**细碎需求先交给 AI，你专注评审与发布**——协作更可规模化，你也更不容易被琐事绑架。
+
+## 30 秒看懂
+
+| 你是谁 | 你得到什么 |
+|--------|------------|
+| **维护者** | `init.sh` → `provision.sh`：拉起节点与容器网络，端口按节点号递增（Vue / FastAPI / SSH） |
+| **需求方 / 协作者** | SSH 进环境，在挂载的前后端仓库里直接用 AI 做小改动与迭代，容器内可正常 `git diff` |
+| **要收尾** | `./scripts/teardown.sh node-<N> --rm-root` 清掉环境与目录（示例见「一键部署」） |
+
+## 演示 Demo（建议放 GIF，欢迎 PR 替换）
+
+将 60–90 秒的录屏放到 `docs/demo.gif`（或外链），内容建议：**clone → `init.sh` → `provision.sh` → SSH 登录 → `npx @z_ai/coding-helper` 配置**。放好后在本节贴：
+
+```markdown
+![demo](docs/demo.gif)
+```
+
+> 仓库维护者可在 GitHub 仓库页 **Settings → General → Topics** 增加标签以便被发现，例如：`docker` `terraform` `vite` `fastapi` `ssh` `dev-environment` `ai-coding` `claude` `provision`。
+
+详见：[贡献指南](CONTRIBUTING.md) · [发版说明模板](docs/release-notes-template.md)
 
 ## 协作模式对比与本项目优势
 
