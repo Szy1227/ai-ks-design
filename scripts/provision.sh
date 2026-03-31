@@ -138,6 +138,25 @@ wait_jobs_or_die() {
     die "${stage} 存在失败任务，请根据上方日志修复后重试。"
   fi
 
+  # 并行创建成功后，补充输出 SSH 登录信息（来自 ai-ks-ssh-claude 的 tf_apply.sh 日志）
+  if [[ "${stage}" == "创建阶段（Terraform apply）" ]]; then
+    for i in "${!JOB_NAMES[@]}"; do
+      if [[ "${JOB_NAMES[$i]}" == "ai-ks-ssh-claude(apply)" ]] && [[ -f "${JOB_LOGS[$i]}" ]]; then
+        local ssh_login_block
+        ssh_login_block="$(awk '
+          /===== SSH Login Info =====/ { printing=1; print; next }
+          printing == 1 { print }
+          printing == 1 && /^Command:/ { exit }
+        ' "${JOB_LOGS[$i]}")"
+        if [[ -n "${ssh_login_block}" ]]; then
+          echo ""
+          echo "${ssh_login_block}"
+          echo ""
+        fi
+      fi
+    done
+  fi
+
   for i in "${!JOB_LOGS[@]}"; do
     rm -f "${JOB_LOGS[$i]}"
   done
