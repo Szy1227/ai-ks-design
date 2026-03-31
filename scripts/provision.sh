@@ -89,26 +89,21 @@ clone_or_pull() {
 
 JOB_PIDS=()
 JOB_NAMES=()
-JOB_LOGS=()
 
 reset_jobs() {
   JOB_PIDS=()
   JOB_NAMES=()
-  JOB_LOGS=()
 }
 
 start_job() {
   local name="$1"
   shift
-  local log_file
-  log_file="$(mktemp "/tmp/provision-${name//[^a-zA-Z0-9_-]/_}-XXXX.log")"
   (
     set -euo pipefail
     "$@"
-  ) >"${log_file}" 2>&1 &
+  ) &
   JOB_PIDS+=("$!")
   JOB_NAMES+=("$name")
-  JOB_LOGS+=("${log_file}")
   echo "  [${name}] 已启动 (pid=$!)"
 }
 
@@ -122,44 +117,14 @@ wait_jobs_or_die() {
       echo "  [${JOB_NAMES[$i]}] 完成"
     else
       failed=1
-      echo "  [${JOB_NAMES[$i]}] 失败（日志: ${JOB_LOGS[$i]}）" >&2
+      echo "  [${JOB_NAMES[$i]}] 失败（输出见上方终端）" >&2
     fi
   done
 
   if (( failed > 0 )); then
-    echo "" >&2
-    echo "===== 并行任务失败详情: ${stage} =====" >&2
-    for i in "${!JOB_PIDS[@]}"; do
-      if [[ -f "${JOB_LOGS[$i]}" ]]; then
-        echo "--- ${JOB_NAMES[$i]} ---" >&2
-        sed -n '1,200p' "${JOB_LOGS[$i]}" >&2
-      fi
-    done
-    die "${stage} 存在失败任务，请根据上方日志修复后重试。"
+    die "${stage} 存在失败任务，请根据上方终端输出定位后重试。"
   fi
 
-  # 并行创建成功后，补充输出 SSH 登录信息（来自 ai-ks-ssh-claude 的 tf_apply.sh 日志）
-  if [[ "${stage}" == "创建阶段（Terraform apply）" ]]; then
-    for i in "${!JOB_NAMES[@]}"; do
-      if [[ "${JOB_NAMES[$i]}" == "ai-ks-ssh-claude(apply)" ]] && [[ -f "${JOB_LOGS[$i]}" ]]; then
-        local ssh_login_block
-        ssh_login_block="$(awk '
-          /===== SSH Login Info =====/ { printing=1; print; next }
-          printing == 1 { print }
-          printing == 1 && /^Command:/ { exit }
-        ' "${JOB_LOGS[$i]}")"
-        if [[ -n "${ssh_login_block}" ]]; then
-          echo ""
-          echo "${ssh_login_block}"
-          echo ""
-        fi
-      fi
-    done
-  fi
-
-  for i in "${!JOB_LOGS[@]}"; do
-    rm -f "${JOB_LOGS[$i]}"
-  done
   reset_jobs
 }
 
