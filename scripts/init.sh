@@ -167,17 +167,17 @@ clone_projects() {
   log_info "克隆项目仓库..."
   mkdir -p "${base}"
   
-  # 克隆或更新各仓库
+  # 克隆或更新各仓库（使用 | 作为 URL 与目标目录的分隔符，避免与 GitHub SSH URL 中的冒号冲突）
   local repos=(
-    "git@github.com:Szy1227/ai-ks-vue.git:ai-ks-vue"
-    "git@github.com:Szy1227/ai-ks-fastapi.git:ai-ks-fastapi"
-    "git@github.com:Szy1227/ai-ks-ssh-claude.git:ai-ks-ssh-claude"
-    "git@github.com:Szy1227/ai-ks-tools.git:../ai-ks-tools"
+    "git@github.com:Szy1227/ai-ks-vue.git|ai-ks-vue"
+    "git@github.com:Szy1227/ai-ks-fastapi.git|ai-ks-fastapi"
+    "git@github.com:Szy1227/ai-ks-ssh-claude.git|ai-ks-ssh-claude"
+    "git@github.com:Szy1227/ai-ks-tools.git|../ai-ks-tools"
   )
   
   for repo_info in "${repos[@]}"; do
-    local url="${repo_info%%:*}"
-    local dest="${repo_info#*:}"
+    local url="${repo_info%%|*}"
+    local dest="${repo_info#*|}"
     
     if [[ "$dest" == ".."* ]]; then
       dest="${workspace}/${dest#../}"
